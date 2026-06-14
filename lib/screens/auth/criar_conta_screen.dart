@@ -1,206 +1,221 @@
 import 'package:flutter/material.dart';
-import '../perfil/editar_perfil_screen.dart'; // <-- NOVO IMPORT: Tela de Editar Perfil!
+import 'package:firebase_auth/firebase_auth.dart';
+import '../perfil/editar_perfil_screen.dart';
+import '../feed/feed_olheiro_screen.dart';
 
-// Enum para gerenciar o tipo de conta selecionada
 enum TipoUsuario { jogador, clube, olheiro }
 
 class CriarContaScreen extends StatefulWidget {
   const CriarContaScreen({super.key});
-
   @override
   State<CriarContaScreen> createState() => _CriarContaScreenState();
 }
 
 class _CriarContaScreenState extends State<CriarContaScreen> {
-  // Estado inicial: Jogador selecionado
   TipoUsuario _tipoSelecionado = TipoUsuario.jogador;
-
-  // Controladores para pegar os dados depois no Firebase
   final TextEditingController _nomeController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _senhaController = TextEditingController();
-  final TextEditingController _repitaSenhaController = TextEditingController();
+  bool _isLoading = false;
 
-  // ----------------------------------------------------------------------
-  // AQUI ESTÁ A FUNÇÃO ALTERADA!
-  // ----------------------------------------------------------------------
-  void _realizarCadastro() {
-    // Validação básica futura do Firebase pode entrar aqui
-    print(
-      "Tentando cadastrar: ${_nomeController.text} como ${_tipoSelecionado.name}",
-    );
+  Future<void> _realizarCadastro() async {
+    if (_nomeController.text.isEmpty ||
+        _emailController.text.isEmpty ||
+        _senhaController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preencha todos os campos!')),
+      );
+      return;
+    }
 
-    if (_tipoSelecionado == TipoUsuario.jogador) {
-      // Navega para a tela de EDITAR PERFIL logo após criar a conta!
-      Navigator.push(
+    setState(() => _isLoading = true);
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _senhaController.text.trim(),
+      );
+      if (!mounted) return;
+
+      // Direciona para a tela correta dependendo do tipo
+      if (_tipoSelecionado == TipoUsuario.jogador) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const EditarPerfilScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const FeedOlheiroScreen()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String mensagem = 'Erro ao criar conta';
+      if (e.code == 'email-already-in-use') {
+        mensagem = 'Este e-mail já está cadastrado.';
+      } else if (e.code == 'weak-password') {
+        mensagem = 'A senha é muito fraca (mínimo de 6 caracteres).';
+      }
+      ScaffoldMessenger.of(
         context,
-        MaterialPageRoute(builder: (context) => const EditarPerfilScreen()),
-      );
-    } else if (_tipoSelecionado == TipoUsuario.clube) {
-      // Navegar para a tela do Clube (Ainda será desenvolvida)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tela do Clube ainda será desenvolvida!')),
-      );
-    } else {
-      // Navegar para a tela do Olheiro (Ainda será desenvolvida)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tela do Olheiro ainda será desenvolvida!'),
-        ),
-      );
+      ).showSnackBar(SnackBar(content: Text(mensagem)));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
-  // ----------------------------------------------------------------------
 
   @override
   void dispose() {
     _nomeController.dispose();
     _emailController.dispose();
     _senhaController.dispose();
-    _repitaSenhaController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFBFDF8),
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1E3A2F)),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 10),
-              const Text(
-                'Criar Conta',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E3A2F),
-                ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- Cabeçalho ---
+            const Text(
+              'Crie sua Conta',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E3A2F),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Junte-se ao FutConecta e conecte-se ao seu futuro no futebol.',
-                style: TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-              const SizedBox(height: 32),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Junte-se ao FutConecta e mostre seu talento para o mundo.',
+              style: TextStyle(fontSize: 16, color: Colors.black54),
+            ),
+            const SizedBox(height: 32),
 
-              // Campos de Texto
-              _buildTextField(
-                controller: _nomeController,
-                hint: 'Ex: Rian Oliveira',
-                icon: Icons.person_outline,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _emailController,
-                hint: 'seu@email.com',
-                icon: Icons.mail_outline,
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _senhaController,
-                hint: 'Mínimo 6 caracteres',
-                icon: Icons.lock_outline,
-                isPassword: true,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _repitaSenhaController,
-                hint: 'Repita sua senha',
-                icon: Icons.lock_outline,
-                isPassword: true,
-              ),
-              const SizedBox(height: 32),
+            // --- Formulário ---
+            const Text(
+              'Nome Completo',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            _buildTextField(
+              controller: _nomeController,
+              hint: 'Como você quer ser chamado',
+              icon: Icons.person_outline,
+            ),
+            const SizedBox(height: 20),
 
-              // Seletor de Tipo de Usuário
-              const Text(
-                'Eu sou um...',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1E3A2F),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildRoleCard(
-                    tipo: TipoUsuario.jogador,
-                    icon: Icons.sports_soccer,
-                    label: 'Jogador',
-                  ),
-                  const SizedBox(width: 10),
-                  _buildRoleCard(
-                    tipo: TipoUsuario.clube,
-                    icon: Icons.account_balance,
-                    label: 'Clube',
-                  ),
-                  const SizedBox(width: 10),
-                  _buildRoleCard(
-                    tipo: TipoUsuario.olheiro,
-                    icon: Icons.search,
-                    label: 'Olheiro',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 40),
+            const Text(
+              'E-mail',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            _buildTextField(
+              controller: _emailController,
+              hint: 'seu@email.com',
+              icon: Icons.mail_outline,
+            ),
+            const SizedBox(height: 20),
 
-              // Botão Cadastrar
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: _realizarCadastro, // Chama a função que alteramos!
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF388E3C),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Cadastrar',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+            const Text(
+              'Senha',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            _buildTextField(
+              controller: _senhaController,
+              hint: 'Mínimo de 6 caracteres',
+              icon: Icons.lock_outline,
+              isPassword: true,
+            ),
+            const SizedBox(height: 32),
+
+            // --- Seletor de Tipo de Conta (Cards Visuais) ---
+            const Text(
+              'Eu sou um:',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _buildRoleCard(
+                  title: 'Jogador',
+                  icon: Icons.sports_soccer,
+                  type: TipoUsuario.jogador,
                 ),
+                const SizedBox(width: 16),
+                _buildRoleCard(
+                  title: 'Olheiro/Clube',
+                  icon: Icons.search,
+                  type: TipoUsuario.olheiro,
+                ),
+              ],
+            ),
+            const SizedBox(height: 40),
+
+            // --- Botão de Cadastro ---
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _realizarCadastro,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF388E3C),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : const Text(
+                        'Finalizar Cadastro',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
-              const SizedBox(height: 30),
-            ],
-          ),
+            ),
+            const SizedBox(height: 30),
+          ],
         ),
       ),
     );
   }
 
-  // Widget construtor para os inputs de texto
+  // --- WIDGETS AUXILIARES ---
+
+  // Construtor das Caixas de Texto
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
     required IconData icon,
     bool isPassword = false,
-    TextInputType keyboardType = TextInputType.text,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: isPassword,
-      keyboardType: keyboardType,
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: Colors.black54),
         hintText: hint,
@@ -220,46 +235,53 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
     );
   }
 
-  // Widget construtor para os cards selecionáveis (Jogador, Clube, Olheiro)
+  // Construtor dos Cards de Escolha (Jogador vs Olheiro)
   Widget _buildRoleCard({
-    required TipoUsuario tipo,
+    required String title,
     required IconData icon,
-    required String label,
+    required TipoUsuario type,
   }) {
-    final isSelected = _tipoSelecionado == tipo;
+    bool isSelected = _tipoSelecionado == type;
 
     return Expanded(
       child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _tipoSelecionado = tipo;
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+        onTap: () => setState(() => _tipoSelecionado = type),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 20),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFE8F5E9) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            color: isSelected ? const Color(0xFF388E3C) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isSelected
                   ? const Color(0xFF388E3C)
                   : Colors.grey.shade300,
-              width: isSelected ? 1.5 : 1.0,
+              width: 1.5,
             ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF388E3C).withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : [],
           ),
           child: Column(
             children: [
               Icon(
                 icon,
-                color: isSelected ? const Color(0xFF388E3C) : Colors.black54,
-                size: 28,
+                size: 36,
+                color: isSelected ? Colors.white : Colors.black54,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
-                label,
+                title,
                 style: TextStyle(
-                  color: isSelected ? const Color(0xFF388E3C) : Colors.black87,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? Colors.white : Colors.black87,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
                 ),
               ),
             ],

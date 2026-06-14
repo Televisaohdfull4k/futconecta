@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "379214372274",
+    "project_id": "futconecta",
+    "storage_bucket": "futconecta.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:379214372274:android:e3ad16197d0b8829cd98ab",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqm3skUjudCqsW8K5Zj4XXXHx_lbM9610"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

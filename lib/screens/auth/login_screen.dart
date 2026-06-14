@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'criar_conta_screen.dart'; // Importante para podermos navegar para a tela de criar conta
+import 'package:firebase_auth/firebase_auth.dart';
+import 'criar_conta_screen.dart';
+import '../perfil/perfil_jogador_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,10 +13,43 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _senhaController = TextEditingController();
+  bool _isLoading = false;
 
-  void _fazerLogin() {
-    // Lógica futura de autenticação no Firebase entra aqui
-    print("Email: ${_emailController.text}");
+  Future<void> _fazerLoginEmail() async {
+    if (_emailController.text.isEmpty || _senhaController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preencha o e-mail e a senha!')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _senhaController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const PerfilJogadorScreen()),
+      );
+    } on FirebaseAuthException catch (e) {
+      String mensagem = 'Erro ao fazer login';
+      if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential') {
+        mensagem = 'E-mail ou senha incorretos.';
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(mensagem)));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -26,52 +61,43 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Pegar o tamanho da tela para definir a altura do card branco
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
       body: Stack(
         children: [
-          // 1. FUNDO DA TELA (Imagem com filtro verde)
+          // 1. FUNDO DA TELA (IMAGEM + DEGRADÊ)
           Container(
             height: size.height,
             width: double.infinity,
             decoration: const BoxDecoration(
               image: DecorationImage(
-                // Imagem de estádio/bola da internet (placeholder)
                 image: NetworkImage(
                   'https://images.unsplash.com/photo-1518605368461-1ee7e5376cb1?q=80&w=1000',
                 ),
                 fit: BoxFit.cover,
               ),
             ),
-            // Filtro (Gradient) por cima da imagem
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    const Color(
-                      0xFF388E3C,
-                    ).withOpacity(0.85), // Verde escuro no topo
-                    const Color(
-                      0xFF388E3C,
-                    ).withOpacity(0.4), // Meio mais transparente
-                    Colors.black.withOpacity(
-                      0.6,
-                    ), // Preto em baixo para dar contraste
+                    const Color(0xFF388E3C).withOpacity(0.85),
+                    const Color(0xFF388E3C).withOpacity(0.4),
+                    Colors.black.withOpacity(0.6),
                   ],
                 ),
               ),
             ),
           ),
 
-          // 2. CONTEÚDO (Logo no topo e Card Branco em baixo)
+          // 2. CONTEÚDO (LOGOTIPO E FORMULÁRIO)
           SafeArea(
             child: Column(
               children: [
-                // Parte Superior (Logo e Textos)
+                // Topo com Logotipo
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -106,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
-                // Parte Inferior (Card Branco)
+                // Caixa Branca com Formulário
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -138,7 +164,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Input E-mail
                       const Text(
                         'E-mail',
                         style: TextStyle(
@@ -154,7 +179,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Input Senha
                       const Text(
                         'Senha',
                         style: TextStyle(
@@ -170,11 +194,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         isPassword: true,
                       ),
 
-                      // Botão Esqueceu a Senha
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Recuperação de senha em breve!'),
+                              ),
+                            );
+                          },
                           child: const Text(
                             'Esqueceu a senha?',
                             style: TextStyle(
@@ -191,99 +220,35 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: double.infinity,
                         height: 55,
                         child: ElevatedButton(
-                          onPressed: _fazerLogin,
+                          onPressed: _isLoading ? null : _fazerLoginEmail,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF388E3C),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
-                            'Entrar na Plataforma',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Entrar na Plataforma',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Ou continue com
-                      Row(
-                        children: [
-                          Expanded(child: Divider(color: Colors.grey.shade300)),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16),
-                            child: Text(
-                              'ou continue com',
-                              style: TextStyle(
-                                color: Colors.black54,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          Expanded(child: Divider(color: Colors.grey.shade300)),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Botões Sociais (Google / Apple)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {},
-                              icon: const Icon(
-                                Icons.g_mobiledata,
-                                color: Colors.black87,
-                                size: 28,
-                              ),
-                              label: const Text(
-                                'Google',
-                                style: TextStyle(color: Colors.black87),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                side: BorderSide(color: Colors.grey.shade300),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {},
-                              icon: const Icon(
-                                Icons.apple,
-                                color: Colors.black87,
-                              ),
-                              label: const Text(
-                                'Apple',
-                                style: TextStyle(color: Colors.black87),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                side: BorderSide(color: Colors.grey.shade300),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
 
                       const SizedBox(height: 30),
 
-                      // LINK PARA CRIAR CONTA!
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -293,7 +258,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           TextButton(
                             onPressed: () {
-                              // Navegação para a tela de criar conta que fizemos antes!
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -323,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Widget reaproveitável para os inputs (igual usamos na tela de criar conta)
+  // Widget construtor das caixas de texto bonitas
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
