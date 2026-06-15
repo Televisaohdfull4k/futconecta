@@ -10,7 +10,7 @@ extension FeedPostTypeX on FeedPostType {
       case FeedPostType.update:
         return 'Atualizacao';
       case FeedPostType.opportunity:
-        return 'Oportunidade';
+        return 'Peneira';
       case FeedPostType.highlight:
         return 'Destaque';
     }

@@ -7,9 +7,13 @@ import 'package:image_picker/image_picker.dart';
 class StorageService {
   StorageService({http.Client? client}) : _client = client ?? http.Client();
 
-  static const _cloudName = String.fromEnvironment('CLOUDINARY_CLOUD_NAME');
+  static const _cloudName = String.fromEnvironment(
+    'CLOUDINARY_CLOUD_NAME',
+    defaultValue: 'dcj2towtq',
+  );
   static const _uploadPreset = String.fromEnvironment(
     'CLOUDINARY_UPLOAD_PRESET',
+    defaultValue: 'futconecta_unsigned',
   );
   static const _rootFolder = String.fromEnvironment(
     'CLOUDINARY_FOLDER',
@@ -108,7 +112,7 @@ class StorageService {
         _cloudName == 'SEU_CLOUD_NAME' ||
         _uploadPreset == 'SEU_UPLOAD_PRESET') {
       throw Exception(
-        'Configure CLOUDINARY_CLOUD_NAME e CLOUDINARY_UPLOAD_PRESET no launch.json.',
+        'Configure CLOUDINARY_CLOUD_NAME e CLOUDINARY_UPLOAD_PRESET com --dart-define ou no launch.json.',
       );
     }
   }

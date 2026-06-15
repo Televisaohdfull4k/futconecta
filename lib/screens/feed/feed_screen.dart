@@ -189,7 +189,7 @@ class _FeedHero extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             isScout
-                ? 'Oportunidades, destaques e movimentacoes da comunidade.'
+                ? 'Peneiras, oportunidades e destaques da comunidade.'
                 : 'Mostre evolucao, treinos e conquistas para quem observa.',
             style: const TextStyle(
               color: Color(0xFF9DB9A8),
@@ -252,7 +252,7 @@ class _FeedTypeFilter extends StatelessWidget {
     final filters = <({String label, FeedPostType? type})>[
       (label: 'TODOS', type: null),
       (label: 'TREINOS', type: FeedPostType.update),
-      (label: 'VAGAS', type: FeedPostType.opportunity),
+      (label: 'PENEIRAS', type: FeedPostType.opportunity),
       (label: 'HIGHLIGHTS', type: FeedPostType.highlight),
     ];
 
@@ -464,7 +464,7 @@ class _ComposerState extends State<_Composer> {
                     fillColor: _FeedPalette.field,
                     hintStyle: const TextStyle(color: _FeedPalette.muted),
                     hintText: isScout
-                        ? 'Divulgue uma oportunidade ou observacao...'
+                        ? 'Divulgue uma peneira, oportunidade ou observacao...'
                         : 'Compartilhe um treino, jogo ou conquista...',
                   ),
                 ),

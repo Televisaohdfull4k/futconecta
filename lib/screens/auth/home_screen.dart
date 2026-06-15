@@ -4,7 +4,6 @@ import '../../models/app_user.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../feed/chat_lista_screen.dart';
-import '../feed/feed_olheiro_screen.dart';
 import '../feed/feed_screen.dart';
 import '../favoritos/favoritos_screen.dart';
 import '../perfil/perfil_jogador_screen.dart';
@@ -46,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final isScout = user.tipoUsuario == UserType.clubeTreinadorOlheiro;
         final telas = isScout
             ? const [
-                FeedOlheiroScreen(),
+                FeedScreen(),
                 RankingScreen(),
                 FavoritosScreen(),
                 ChatListaScreen(),
@@ -61,7 +60,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ];
         final items = isScout
             ? const [
-                _BottomNavItem(icon: Icons.home_rounded, label: 'Inicio'),
+                _BottomNavItem(
+                  icon: Icons.dynamic_feed_outlined,
+                  selectedIcon: Icons.dynamic_feed_rounded,
+                  label: 'Feed',
+                ),
                 _BottomNavItem(
                   icon: Icons.leaderboard_outlined,
                   selectedIcon: Icons.leaderboard_rounded,
