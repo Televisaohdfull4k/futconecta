@@ -196,30 +196,6 @@ class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
           ),
         ],
       ),
-
-      // --- BOTTOM NAVIGATION BAR (Menu Inferior) ---
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        selectedItemColor: const Color(0xFF00B167),
-        unselectedItemColor: Colors.grey.shade400,
-        showUnselectedLabels: true,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Descobrir'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite_border),
-            label: 'Favoritos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Chat',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
-          ),
-        ],
-      ),
     );
   }
 
@@ -241,7 +217,7 @@ class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black.withOpacity(0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),

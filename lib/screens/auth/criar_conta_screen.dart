@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Importação essencial para salvar dados
 import '../perfil/editar_perfil_screen.dart';
-import '../feed/feed_olheiro_screen.dart';
+import 'home_screen.dart';
 
 enum TipoUsuario { jogador, clube, olheiro }
 
@@ -30,13 +31,30 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _senhaController.text.trim(),
-      );
+      // 1. Cria o usuário no Autenticador
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _senhaController.text.trim(),
+          );
+
+      // 2. Salva o nome e tipo no Firestore vinculado ao ID do usuário criado
+      await FirebaseFirestore.instance
+          .collection('jogadores')
+          .doc(userCredential.user!.uid)
+          .set({
+            'nome': _nomeController.text.trim(),
+            'email': _emailController.text.trim(),
+            'tipo': _tipoSelecionado
+                .toString()
+                .split('.')
+                .last, // Salva apenas 'jogador' ou 'olheiro'
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
       if (!mounted) return;
 
-      // Direciona para a tela correta dependendo do tipo
+      // 3. Direciona para a tela correta dependendo do tipo
       if (_tipoSelecionado == TipoUsuario.jogador) {
         Navigator.pushReplacement(
           context,
@@ -45,7 +63,7 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const FeedOlheiroScreen()),
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -88,7 +106,6 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Cabeçalho ---
             const Text(
               'Crie sua Conta',
               style: TextStyle(
@@ -103,8 +120,6 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
               style: TextStyle(fontSize: 16, color: Colors.black54),
             ),
             const SizedBox(height: 32),
-
-            // --- Formulário ---
             const Text(
               'Nome Completo',
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
@@ -116,7 +131,6 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
               icon: Icons.person_outline,
             ),
             const SizedBox(height: 20),
-
             const Text(
               'E-mail',
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
@@ -128,7 +142,6 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
               icon: Icons.mail_outline,
             ),
             const SizedBox(height: 20),
-
             const Text(
               'Senha',
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
@@ -141,8 +154,6 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
               isPassword: true,
             ),
             const SizedBox(height: 32),
-
-            // --- Seletor de Tipo de Conta (Cards Visuais) ---
             const Text(
               'Eu sou um:',
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
@@ -164,8 +175,6 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
               ],
             ),
             const SizedBox(height: 40),
-
-            // --- Botão de Cadastro ---
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -204,9 +213,6 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
-
-  // Construtor das Caixas de Texto
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
@@ -235,14 +241,12 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
     );
   }
 
-  // Construtor dos Cards de Escolha (Jogador vs Olheiro)
   Widget _buildRoleCard({
     required String title,
     required IconData icon,
     required TipoUsuario type,
   }) {
     bool isSelected = _tipoSelecionado == type;
-
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _tipoSelecionado = type),
