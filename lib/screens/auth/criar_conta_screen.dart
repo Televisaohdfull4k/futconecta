@@ -39,6 +39,7 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
 
     setState(() => _isLoading = true);
     try {
+<<<<<<< HEAD
       final user = await _authService.createAccount(
         nome: _nomeController.text,
         email: _emailController.text,
@@ -47,6 +48,42 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
         estado: _estadoController.text,
         tipoUsuario: _tipoSelecionado,
       );
+=======
+      // 1. Cria o usuário no Autenticador
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _senhaController.text.trim(),
+          );
+
+      // 2. Salva o nome e tipo no Firestore vinculado ao ID do usuário criado
+      await FirebaseFirestore.instance
+          .collection('jogadores')
+          .doc(userCredential.user!.uid)
+          .set({
+            'nome': _nomeController.text.trim(),
+            'email': _emailController.text.trim(),
+            'tipo': _tipoSelecionado.toString().split('.').last,
+            'idade': '',
+            'cidade': '',
+            'telefone': '',
+            'biografia': '',
+            'altura': '',
+            'peso': '',
+            'posicao': '',
+            'posicaoSecundaria': '',
+            'peDominante': '',
+            'clubeAtual': '',
+            'experiencia': '',
+            'partidas': '',
+            'gols': '',
+            'assistencias': '',
+            'fotoUrl': '',
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+>>>>>>> 86bafc2ad73c7fca6b4ac07ce7c58fcbfa02ed49
       if (!mounted) return;
       if (user.tipoUsuario == UserType.jogador) {
         Navigator.pushReplacement(
