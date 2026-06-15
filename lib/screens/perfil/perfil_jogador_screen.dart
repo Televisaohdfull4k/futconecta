@@ -1,11 +1,17 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import '../auth/login_screen.dart';
-import 'editar_perfil_screen.dart'; // Importação da tela de edição
+import 'editar_perfil_screen.dart';
 
 class PerfilJogadorScreen extends StatelessWidget {
   const PerfilJogadorScreen({super.key});
+
+  DocumentReference<Map<String, dynamic>>? get _perfilRef {
+    final usuario = FirebaseAuth.instance.currentUser;
+    if (usuario == null) return null;
+    return FirebaseFirestore.instance.collection('jogadores').doc(usuario.uid);
+  }
 
   Future<void> _abrirPublicacao(BuildContext context) async {
     final textoController = TextEditingController();
@@ -51,7 +57,8 @@ class PerfilJogadorScreen extends StatelessWidget {
     if (conteudo == null || conteudo.isEmpty) return;
 
     final usuario = FirebaseAuth.instance.currentUser;
-    if (usuario == null) {
+    final perfilRef = _perfilRef;
+    if (usuario == null || perfilRef == null) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Faça login para publicar.')),
@@ -60,21 +67,18 @@ class PerfilJogadorScreen extends StatelessWidget {
     }
 
     try {
-      final jogadorDoc = await FirebaseFirestore.instance
-          .collection('jogadores')
-          .doc(usuario.uid)
-          .get();
+      final jogadorDoc = await perfilRef.get();
       final jogador = jogadorDoc.data() ?? {};
 
       await FirebaseFirestore.instance.collection('publicacoes').add({
         'jogadorId': usuario.uid,
-        'nome': jogador['nome'] ?? usuario.displayName ?? 'Jogador',
+        'nome': _texto(jogador['nome'], 'Jogador'),
         'email': usuario.email,
-        'posicao': jogador['posicao'] ?? 'Atleta',
-        'cidade': jogador['cidade'] ?? 'Cidade não informada',
-        'idade': jogador['idade'] ?? '',
-        'clube': jogador['clubeAtual'] ?? '',
-        'fotoUrl': jogador['fotoUrl'] ?? '',
+        'posicao': _texto(jogador['posicao'], 'Atleta'),
+        'cidade': _texto(jogador['cidade'], 'Cidade não informada'),
+        'idade': _texto(jogador['idade'], ''),
+        'clube': _texto(jogador['clubeAtual'], ''),
+        'fotoUrl': _texto(jogador['fotoUrl'], ''),
         'conteudo': conteudo,
         'dataPublicacao': Timestamp.fromDate(DateTime.now()),
         'createdAt': FieldValue.serverTimestamp(),
@@ -92,8 +96,15 @@ class PerfilJogadorScreen extends StatelessWidget {
     }
   }
 
+  static String _texto(dynamic valor, String fallback) {
+    final texto = (valor ?? '').toString().trim();
+    return texto.isEmpty ? fallback : texto;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final perfilRef = _perfilRef;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -113,7 +124,6 @@ class PerfilJogadorScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.edit, color: Color(0xFF388E3C)),
             onPressed: () {
-              // Direciona o usuário para a tela de Editar Perfil
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -125,12 +135,10 @@ class PerfilJogadorScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.redAccent),
             onPressed: () async {
-              // Faz o logout do Firebase
               await FirebaseAuth.instance.signOut();
 
               if (!context.mounted) return;
 
-              // Retorna para a tela de Login limpando o histórico de navegação
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -140,309 +148,271 @@ class PerfilJogadorScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header do Perfil
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 10,
-                    offset: Offset(0, 5),
-                  ),
-                ],
+      body: perfilRef == null
+          ? const Center(child: Text('Faça login para ver seu perfil.'))
+          : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: perfilRef.snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(
+                    child: Text('Não foi possível carregar seu perfil.'),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final perfil = snapshot.data?.data() ?? {};
+                return _PerfilConteudo(
+                  perfil: perfil,
+                  onPublicar: () => _abrirPublicacao(context),
+                );
+              },
+            ),
+    );
+  }
+}
+
+class _PerfilConteudo extends StatelessWidget {
+  const _PerfilConteudo({required this.perfil, required this.onPublicar});
+
+  final Map<String, dynamic> perfil;
+  final VoidCallback onPublicar;
+
+  String _texto(String campo, String fallback) {
+    final texto = (perfil[campo] ?? '').toString().trim();
+    return texto.isEmpty ? fallback : texto;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final nome = _texto('nome', 'Jogador');
+    final posicao = _texto('posicao', 'Atleta');
+    final idade = _texto('idade', '');
+    final cidade = _texto('cidade', 'Cidade não informada');
+    final altura = _texto('altura', '-');
+    final peso = _texto('peso', '-');
+    final gols = _texto('gols', '0');
+    final partidas = _texto('partidas', '0');
+    final assistencias = _texto('assistencias', '0');
+    final biografia = _texto(
+      'biografia',
+      'Complete seu perfil para contar sua história no futebol.',
+    );
+    final fotoUrl = _texto('fotoUrl', '');
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(30),
+                bottomRight: Radius.circular(30),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Column(
-                children: [
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      const CircleAvatar(
-                        radius: 60,
-                        backgroundImage: NetworkImage(
-                          'https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=500',
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 10,
+                  offset: Offset(0, 5),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 60,
+                  backgroundColor: const Color(0xFFE8F5E9),
+                  backgroundImage: fotoUrl.isNotEmpty
+                      ? NetworkImage(fotoUrl)
+                      : null,
+                  child: fotoUrl.isEmpty
+                      ? const Icon(
+                          Icons.person,
+                          size: 60,
                           color: Color(0xFF388E3C),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.verified,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ],
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  nome,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E3A2F),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Rian Oliveira',
-                    style: TextStyle(
-                      fontSize: 26,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$posicao${idade.isNotEmpty ? ' • $idade anos' : ''}',
+                    style: const TextStyle(
+                      color: Color(0xFF388E3C),
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E3A2F),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.location_on, size: 20, color: Colors.black54),
+                    const SizedBox(width: 4),
+                    Text(cidade, style: const TextStyle(color: Colors.black87)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.height, size: 20, color: Colors.black54),
+                    const SizedBox(width: 4),
+                    Text(
+                      altura == '-' ? altura : '${altura}m',
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
-                      borderRadius: BorderRadius.circular(20),
+                    const SizedBox(width: 16),
+                    const Icon(
+                      Icons.monitor_weight_outlined,
+                      size: 20,
+                      color: Colors.black54,
                     ),
-                    child: const Text(
-                      'Meio-Campo • 18 anos',
+                    const SizedBox(width: 4),
+                    Text(
+                      peso == '-' ? peso : '$peso kg',
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onPublicar,
+                    icon: const Icon(
+                      Icons.add,
+                      color: Color(0xFF388E3C),
+                      size: 20,
+                    ),
+                    label: const Text(
+                      'Publicar',
                       style: TextStyle(
                         color: Color(0xFF388E3C),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Dados Físicos (Altura e Peso)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.height, size: 20, color: Colors.black54),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '1.82m',
-                        style: TextStyle(
-                          color: Colors.black87,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Icon(
-                        Icons.monitor_weight_outlined,
-                        size: 20,
-                        color: Colors.black54,
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '75 kg',
-                        style: TextStyle(
-                          color: Colors.black87,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Botões de Ação (Compartilhar e Entrar em Contato)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _abrirPublicacao(context),
-                      icon: const Icon(
-                        Icons.add,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
                         color: Color(0xFF388E3C),
-                        size: 20,
+                        width: 1.5,
                       ),
-                      label: const Text(
-                        'Publicar',
-                        style: TextStyle(
-                          color: Color(0xFF388E3C),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: Color(0xFF388E3C),
-                          width: 1.5,
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Iniciando contato...')),
-                        );
-                      },
-                      icon: const Icon(
-                        Icons.chat_bubble_outline,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      label: const Text(
-                        'Contato',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF388E3C),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Estatísticas
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Estatísticas da Temporada',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E3A2F),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildStatCard('Gols', '12', Icons.sports_soccer),
-                      _buildStatCard('Partidas', '34', Icons.stadium),
-                      _buildStatCard('Assists', '15', Icons.handshake),
-                    ],
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  const Text(
-                    'Desempenho Técnico',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E3A2F),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Iniciando contato...')),
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.chat_bubble_outline,
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      size: 20,
                     ),
-                    child: Column(
-                      children: [
-                        _buildTechStat(
-                          'Precisão de Passe',
-                          0.88,
-                          const Color(0xFF388E3C),
-                        ),
-                        _buildTechStat(
-                          'Dribles',
-                          0.74,
-                          const Color(0xFF2196F3),
-                        ),
-                        _buildTechStat(
-                          'Chutes ao Alvo',
-                          0.62,
-                          const Color(0xFFFF9800),
-                        ),
-                      ],
+                    label: const Text(
+                      'Contato',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF388E3C),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 32),
-
-                  // Área de Vídeos de Desempenho
-                  const Text(
-                    'Vídeos de Desempenho',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E3A2F),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 140,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: 3, // Simulando 3 vídeos
-                      itemBuilder: (context, index) {
-                        return Container(
-                          width: 220,
-                          margin: const EdgeInsets.only(right: 16),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            image: const DecorationImage(
-                              image: NetworkImage(
-                                'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=500',
-                              ),
-                              fit: BoxFit.cover,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.play_circle_fill,
-                                color: Colors.white,
-                                size: 48,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 32),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Sobre o atleta',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E3A2F),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  biografia,
+                  style: const TextStyle(color: Colors.black87, height: 1.4),
+                ),
+                const SizedBox(height: 32),
+                const Text(
+                  'Estatísticas da Temporada',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E3A2F),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildStatCard('Gols', gols, Icons.sports_soccer),
+                    _buildStatCard('Partidas', partidas, Icons.stadium),
+                    _buildStatCard('Assists', assistencias, Icons.handshake),
+                  ],
+                ),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -486,43 +456,6 @@ class PerfilJogadorScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTechStat(String label, double val, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              Text(
-                '${(val * 100).toInt()}%',
-                style: TextStyle(fontWeight: FontWeight.bold, color: color),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: val,
-              color: color,
-              minHeight: 8,
-              backgroundColor: color.withOpacity(0.15),
-            ),
-          ),
-        ],
       ),
     );
   }

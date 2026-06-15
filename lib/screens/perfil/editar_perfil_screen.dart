@@ -35,6 +35,56 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
 
+  @override
+  void initState() {
+    super.initState();
+    _carregarPerfil();
+  }
+
+  Future<void> _carregarPerfil() async {
+    final usuario = FirebaseAuth.instance.currentUser;
+    if (usuario == null) return;
+
+    final documento = await FirebaseFirestore.instance
+        .collection('jogadores')
+        .doc(usuario.uid)
+        .get();
+    final perfil = documento.data();
+    if (perfil == null || !mounted) return;
+
+    setState(() {
+      _nomeController.text = _valor(perfil['nome']);
+      _idadeController.text = _valor(perfil['idade']);
+      _cidadeController.text = _valor(perfil['cidade']);
+      _telefoneController.text = _valor(perfil['telefone']);
+      _emailController.text = _valor(perfil['email']);
+      _biografiaController.text = _valor(perfil['biografia']);
+      _alturaController.text = _valor(perfil['altura']);
+      _pesoController.text = _valor(perfil['peso']);
+      _clubeAtualController.text = _valor(perfil['clubeAtual']);
+      _experienciaController.text = _valor(perfil['experiencia']);
+      _partidasController.text = _valor(perfil['partidas']);
+      _golsController.text = _valor(perfil['gols']);
+      _assistenciasController.text = _valor(perfil['assistencias']);
+      _posicaoSelecionada = _opcaoValida(_posicoes, perfil['posicao']);
+      _posicaoSecundariaSelecionada = _opcaoValida(
+        _posicoes,
+        perfil['posicaoSecundaria'],
+      );
+      _peDominanteSelecionado = _opcaoValida(
+        _pesDominantes,
+        perfil['peDominante'],
+      );
+    });
+  }
+
+  String _valor(dynamic valor) => (valor ?? '').toString();
+
+  String? _opcaoValida(List<String> opcoes, dynamic valor) {
+    final texto = _valor(valor);
+    return opcoes.contains(texto) ? texto : null;
+  }
+
   Future<void> _salvarPerfil() async {
     final usuario = FirebaseAuth.instance.currentUser;
     if (usuario == null) {
@@ -97,6 +147,24 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
     'Atacante',
   ];
   final List<String> _pesDominantes = ['Direito', 'Esquerdo', 'Ambos'];
+
+  @override
+  void dispose() {
+    _nomeController.dispose();
+    _idadeController.dispose();
+    _cidadeController.dispose();
+    _telefoneController.dispose();
+    _emailController.dispose();
+    _biografiaController.dispose();
+    _alturaController.dispose();
+    _pesoController.dispose();
+    _clubeAtualController.dispose();
+    _experienciaController.dispose();
+    _partidasController.dispose();
+    _golsController.dispose();
+    _assistenciasController.dispose();
+    super.dispose();
+  }
 
   Widget _buildSectionTitle(String title) {
     return Padding(

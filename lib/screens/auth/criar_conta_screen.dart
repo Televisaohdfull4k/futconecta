@@ -45,11 +45,24 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
           .set({
             'nome': _nomeController.text.trim(),
             'email': _emailController.text.trim(),
-            'tipo': _tipoSelecionado
-                .toString()
-                .split('.')
-                .last, // Salva apenas 'jogador' ou 'olheiro'
+            'tipo': _tipoSelecionado.toString().split('.').last,
+            'idade': '',
+            'cidade': '',
+            'telefone': '',
+            'biografia': '',
+            'altura': '',
+            'peso': '',
+            'posicao': '',
+            'posicaoSecundaria': '',
+            'peDominante': '',
+            'clubeAtual': '',
+            'experiencia': '',
+            'partidas': '',
+            'gols': '',
+            'assistencias': '',
+            'fotoUrl': '',
             'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
           });
 
       if (!mounted) return;
