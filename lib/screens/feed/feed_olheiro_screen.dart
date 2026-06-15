@@ -1,5 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../perfil/perfil_jogador_screen.dart'; // Importante para o olheiro poder clicar e ver o perfil completo!
+import '../perfil/perfil_jogador_screen.dart';
 
 class FeedOlheiroScreen extends StatefulWidget {
   const FeedOlheiroScreen({super.key});
@@ -11,7 +12,6 @@ class FeedOlheiroScreen extends StatefulWidget {
 class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
   final TextEditingController _buscaController = TextEditingController();
 
-  // Controle de qual filtro está selecionado no momento
   String _filtroAtivo = 'Todos';
   final List<String> _filtros = [
     'Todos',
@@ -21,53 +21,18 @@ class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
     'Goleiro',
   ];
 
-  // SIMULAÇÃO DO FIREBASE: Lista de jogadores que aparecerão no Feed
-  final List<Map<String, dynamic>> _jogadoresMock = [
-    {
-      'id': '1',
-      'nome': 'Rian Oliveira',
-      'posicao': 'Meio-Campo Ofensivo',
-      'idade': 18,
-      'cidade': 'Feira de Santana - BA',
-      'fotoUrl':
-          'https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=500',
-      'nota': 9.4,
-      'isVerificado': true,
-    },
-    {
-      'id': '2',
-      'nome': 'Lucas Mendes',
-      'posicao': 'Atacante',
-      'idade': 19,
-      'cidade': 'Salvador - BA',
-      'fotoUrl':
-          'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=500',
-      'nota': 8.7,
-      'isVerificado': false,
-    },
-    {
-      'id': '3',
-      'nome': 'Pedro Santos',
-      'posicao': 'Zagueiro',
-      'idade': 21,
-      'cidade': 'Feira de Santana - BA',
-      'fotoUrl':
-          'https://images.unsplash.com/photo-1526232761682-d26e03ac148e?q=80&w=500',
-      'nota': 8.9,
-      'isVerificado': true,
-    },
-    {
-      'id': '4',
-      'nome': 'Gabriel Costa',
-      'posicao': 'Meio-Campo',
-      'idade': 17,
-      'cidade': 'São Paulo - SP',
-      'fotoUrl':
-          'https://images.unsplash.com/photo-1600250395372-22ed9bbf0e75?q=80&w=500',
-      'nota': 8.2,
-      'isVerificado': false,
-    },
-  ];
+  Stream<QuerySnapshot<Map<String, dynamic>>> get _publicacoesStream {
+    return FirebaseFirestore.instance
+        .collection('publicacoes')
+        .orderBy('dataPublicacao', descending: true)
+        .snapshots();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _buscaController.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -75,11 +40,40 @@ class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
     super.dispose();
   }
 
+  bool _passaNosFiltros(Map<String, dynamic> publicacao) {
+    final busca = _buscaController.text.trim().toLowerCase();
+    final nome = (publicacao['nome'] ?? '').toString().toLowerCase();
+    final cidade = (publicacao['cidade'] ?? '').toString().toLowerCase();
+    final clube = (publicacao['clube'] ?? '').toString().toLowerCase();
+    final conteudo = (publicacao['conteudo'] ?? '').toString().toLowerCase();
+    final posicao = (publicacao['posicao'] ?? '').toString();
+
+    final correspondeBusca =
+        busca.isEmpty ||
+        nome.contains(busca) ||
+        cidade.contains(busca) ||
+        clube.contains(busca) ||
+        conteudo.contains(busca);
+    final correspondeFiltro =
+        _filtroAtivo == 'Todos' || posicao.contains(_filtroAtivo);
+
+    return correspondeBusca && correspondeFiltro;
+  }
+
+  String _tempoDaPublicacao(dynamic valor) {
+    if (valor is! Timestamp) return 'agora';
+
+    final diferenca = DateTime.now().difference(valor.toDate());
+    if (diferenca.inMinutes < 1) return 'agora';
+    if (diferenca.inMinutes < 60) return '${diferenca.inMinutes} min';
+    if (diferenca.inHours < 24) return '${diferenca.inHours} h';
+    return '${diferenca.inDays} d';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      // AppBar customizada para o Feed
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -100,7 +94,6 @@ class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
       ),
       body: Column(
         children: [
-          // --- BARRA DE PESQUISA ---
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -132,8 +125,6 @@ class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
               ),
             ),
           ),
-
-          // --- FILTROS RÁPIDOS (Pílulas horizontais) ---
           Container(
             color: Colors.white,
             width: double.infinity,
@@ -143,7 +134,7 @@ class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: _filtros.map((filtro) {
-                  bool isSelected = _filtroAtivo == filtro;
+                  final isSelected = _filtroAtivo == filtro;
                   return Padding(
                     padding: const EdgeInsets.only(right: 10),
                     child: GestureDetector(
@@ -180,17 +171,47 @@ class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // --- LISTA DE JOGADORES (Feed) ---
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _jogadoresMock.length,
-              itemBuilder: (context, index) {
-                final jogador = _jogadoresMock[index];
-                return _buildPlayerCard(jogador);
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _publicacoesStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(
+                    child: Text('Não foi possível carregar o feed.'),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final publicacoes = snapshot.data?.docs
+                        .map((documento) => documento.data())
+                        .where(_passaNosFiltros)
+                        .toList() ??
+                    [];
+
+                if (publicacoes.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Nenhuma publicação ainda. Quando um jogador publicar, aparece aqui na hora.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black54),
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: publicacoes.length,
+                  itemBuilder: (context, index) {
+                    return _buildPublicationCard(publicacoes[index]);
+                  },
+                );
               },
             ),
           ),
@@ -199,11 +220,17 @@ class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
     );
   }
 
-  // --- WIDGET DO CARD DO JOGADOR ---
-  Widget _buildPlayerCard(Map<String, dynamic> jogador) {
+  Widget _buildPublicationCard(Map<String, dynamic> publicacao) {
+    final nome = (publicacao['nome'] ?? 'Jogador').toString();
+    final posicao = (publicacao['posicao'] ?? 'Atleta').toString();
+    final cidade = (publicacao['cidade'] ?? 'Cidade não informada').toString();
+    final idade = (publicacao['idade'] ?? '').toString();
+    final conteudo = (publicacao['conteudo'] ?? '').toString();
+    final fotoUrl = (publicacao['fotoUrl'] ?? '').toString();
+    final tempo = _tempoDaPublicacao(publicacao['dataPublicacao']);
+
     return GestureDetector(
       onTap: () {
-        // Ao clicar no card, o olheiro é levado para a tela de Perfil do Jogador!
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const PerfilJogadorScreen()),
@@ -223,111 +250,93 @@ class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Foto circular
-            Stack(
-              alignment: Alignment.bottomRight,
+            Row(
               children: [
                 CircleAvatar(
-                  radius: 35,
-                  backgroundImage: NetworkImage(jogador['fotoUrl']),
+                  radius: 28,
+                  backgroundColor: const Color(0xFFE8F8F0),
+                  backgroundImage: fotoUrl.isNotEmpty
+                      ? NetworkImage(fotoUrl)
+                      : null,
+                  child: fotoUrl.isEmpty
+                      ? const Icon(Icons.person, color: Color(0xFF00B167))
+                      : null,
                 ),
-                if (jogador['isVerificado'])
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.verified,
-                      color: Color(0xFF00B167),
-                      size: 20,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 16),
-
-            // Informações do jogador
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    jogador['nome'],
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    jogador['posicao'],
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF00B167),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 14,
-                        color: Colors.black45,
-                      ),
-                      const SizedBox(width: 4),
                       Text(
-                        jogador['cidade'],
+                        nome,
                         style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black54,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A1A),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      const Icon(
-                        Icons.cake_outlined,
-                        size: 14,
-                        color: Colors.black45,
-                      ),
-                      const SizedBox(width: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        '${jogador['idade']} anos',
+                        '$posicao${idade.isNotEmpty ? ' • $idade anos' : ''}',
                         style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black54,
+                          fontSize: 13,
+                          color: Color(0xFF00B167),
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                Text(
+                  tempo,
+                  style: const TextStyle(fontSize: 12, color: Colors.black45),
+                ),
+              ],
             ),
-
-            // Nota (Rating)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF9E6), // Fundo amarelado
-                borderRadius: BorderRadius.circular(12),
+            if (conteudo.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text(
+                conteudo,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFF1A1A1A),
+                  height: 1.35,
+                ),
               ),
-              child: Column(
-                children: [
-                  const Icon(Icons.star, color: Color(0xFFFFB800), size: 20),
-                  const SizedBox(height: 4),
-                  Text(
-                    jogador['nota'].toString(),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: Color(0xFF1A1A1A),
-                    ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: Colors.black45,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    cidade,
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
                   ),
-                ],
-              ),
+                ),
+                const Icon(
+                  Icons.flash_on,
+                  size: 16,
+                  color: Color(0xFFFFB800),
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  'Publicado agora',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

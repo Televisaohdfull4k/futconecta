@@ -1,10 +1,96 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth/login_screen.dart';
 import 'editar_perfil_screen.dart'; // Importação da tela de edição
 
 class PerfilJogadorScreen extends StatelessWidget {
   const PerfilJogadorScreen({super.key});
+
+  Future<void> _abrirPublicacao(BuildContext context) async {
+    final textoController = TextEditingController();
+
+    final conteudo = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Nova publicação'),
+          content: TextField(
+            controller: textoController,
+            autofocus: true,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Conte sua novidade, treino ou resultado...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, textoController.text.trim());
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF388E3C),
+              ),
+              child: const Text(
+                'Publicar',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    textoController.dispose();
+
+    if (conteudo == null || conteudo.isEmpty) return;
+
+    final usuario = FirebaseAuth.instance.currentUser;
+    if (usuario == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Faça login para publicar.')),
+      );
+      return;
+    }
+
+    try {
+      final jogadorDoc = await FirebaseFirestore.instance
+          .collection('jogadores')
+          .doc(usuario.uid)
+          .get();
+      final jogador = jogadorDoc.data() ?? {};
+
+      await FirebaseFirestore.instance.collection('publicacoes').add({
+        'jogadorId': usuario.uid,
+        'nome': jogador['nome'] ?? usuario.displayName ?? 'Jogador',
+        'email': usuario.email,
+        'posicao': jogador['posicao'] ?? 'Atleta',
+        'cidade': jogador['cidade'] ?? 'Cidade não informada',
+        'idade': jogador['idade'] ?? '',
+        'clube': jogador['clubeAtual'] ?? '',
+        'fotoUrl': jogador['fotoUrl'] ?? '',
+        'conteudo': conteudo,
+        'dataPublicacao': Timestamp.fromDate(DateTime.now()),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Publicação enviada para o feed!')),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro ao publicar. Tente novamente.')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +106,10 @@ class PerfilJogadorScreen extends StatelessWidget {
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.black87),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline, color: Color(0xFF388E3C)),
+            onPressed: () => _abrirPublicacao(context),
+          ),
           IconButton(
             icon: const Icon(Icons.edit, color: Color(0xFF388E3C)),
             onPressed: () {
@@ -166,20 +256,14 @@ class PerfilJogadorScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Compartilhar perfil...'),
-                          ),
-                        );
-                      },
+                      onPressed: () => _abrirPublicacao(context),
                       icon: const Icon(
-                        Icons.share,
+                        Icons.add,
                         color: Color(0xFF388E3C),
                         size: 20,
                       ),
                       label: const Text(
-                        'Compartilhar',
+                        'Publicar',
                         style: TextStyle(
                           color: Color(0xFF388E3C),
                           fontWeight: FontWeight.bold,

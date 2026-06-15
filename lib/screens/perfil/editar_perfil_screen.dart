@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import '../auth/home_screen.dart'; // Importando a tela principal
 
@@ -32,6 +34,47 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   // Variáveis para a foto de perfil
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
+
+  Future<void> _salvarPerfil() async {
+    final usuario = FirebaseAuth.instance.currentUser;
+    if (usuario == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Faça login para salvar o perfil.')),
+      );
+      return;
+    }
+
+    await FirebaseFirestore.instance.collection('jogadores').doc(usuario.uid).set({
+      'nome': _nomeController.text.trim(),
+      'idade': _idadeController.text.trim(),
+      'cidade': _cidadeController.text.trim(),
+      'telefone': _telefoneController.text.trim(),
+      'email': _emailController.text.trim(),
+      'biografia': _biografiaController.text.trim(),
+      'altura': _alturaController.text.trim(),
+      'peso': _pesoController.text.trim(),
+      'posicao': _posicaoSelecionada,
+      'posicaoSecundaria': _posicaoSecundariaSelecionada,
+      'peDominante': _peDominanteSelecionado,
+      'clubeAtual': _clubeAtualController.text.trim(),
+      'experiencia': _experienciaController.text.trim(),
+      'partidas': _partidasController.text.trim(),
+      'gols': _golsController.text.trim(),
+      'assistencias': _assistenciasController.text.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Perfil atualizado com sucesso!')),
+    );
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+      (route) => false,
+    );
+  }
 
   // Função para abrir a galeria e escolher uma foto
   Future<void> _escolherFoto() async {
@@ -359,20 +402,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                   child: SizedBox(
                     height: 55,
                     child: ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Perfil atualizado com sucesso!'),
-                          ),
-                        );
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const HomeScreen(),
-                          ),
-                          (route) => false,
-                        );
-                      },
+                      onPressed: _salvarPerfil,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF388E3C),
                         shape: RoundedRectangleBorder(
