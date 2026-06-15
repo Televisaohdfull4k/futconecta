@@ -1,336 +1,199 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../perfil/perfil_jogador_screen.dart'; // Importante para o olheiro poder clicar e ver o perfil completo!
 
-class FeedOlheiroScreen extends StatefulWidget {
+import '../../models/player.dart';
+import '../../repositories/favorites_repository.dart';
+import '../../repositories/player_repository.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/player_card.dart';
+import '../perfil/perfil_jogador_screen.dart';
+import '../search/busca_jogadores_screen.dart';
+
+class FeedOlheiroScreen extends StatelessWidget {
   const FeedOlheiroScreen({super.key});
 
   @override
-  State<FeedOlheiroScreen> createState() => _FeedOlheiroScreenState();
-}
-
-class _FeedOlheiroScreenState extends State<FeedOlheiroScreen> {
-  final TextEditingController _buscaController = TextEditingController();
-
-  // Controle de qual filtro está selecionado no momento
-  String _filtroAtivo = 'Todos';
-  final List<String> _filtros = [
-    'Todos',
-    'Meio-Campo',
-    'Atacante',
-    'Zagueiro',
-    'Goleiro',
-  ];
-
-  // SIMULAÇÃO DO FIREBASE: Lista de jogadores que aparecerão no Feed
-  final List<Map<String, dynamic>> _jogadoresMock = [
-    {
-      'id': '1',
-      'nome': 'Rian Oliveira',
-      'posicao': 'Meio-Campo Ofensivo',
-      'idade': 18,
-      'cidade': 'Feira de Santana - BA',
-      'fotoUrl':
-          'https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=500',
-      'nota': 9.4,
-      'isVerificado': true,
-    },
-    {
-      'id': '2',
-      'nome': 'Lucas Mendes',
-      'posicao': 'Atacante',
-      'idade': 19,
-      'cidade': 'Salvador - BA',
-      'fotoUrl':
-          'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=500',
-      'nota': 8.7,
-      'isVerificado': false,
-    },
-    {
-      'id': '3',
-      'nome': 'Pedro Santos',
-      'posicao': 'Zagueiro',
-      'idade': 21,
-      'cidade': 'Feira de Santana - BA',
-      'fotoUrl':
-          'https://images.unsplash.com/photo-1526232761682-d26e03ac148e?q=80&w=500',
-      'nota': 8.9,
-      'isVerificado': true,
-    },
-    {
-      'id': '4',
-      'nome': 'Gabriel Costa',
-      'posicao': 'Meio-Campo',
-      'idade': 17,
-      'cidade': 'São Paulo - SP',
-      'fotoUrl':
-          'https://images.unsplash.com/photo-1600250395372-22ed9bbf0e75?q=80&w=500',
-      'nota': 8.2,
-      'isVerificado': false,
-    },
-  ];
-
-  @override
-  void dispose() {
-    _buscaController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final playerRepository = PlayerRepository();
+    final favoritesRepository = FavoritesRepository();
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      // AppBar customizada para o Feed
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Descobrir Talentos',
-          style: TextStyle(
-            color: Color(0xFF1A1A1A),
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
+        title: const Text('Descobrir talentos'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.black87),
-            onPressed: () {},
+            tooltip: 'Busca avancada',
+            icon: const Icon(Icons.tune),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BuscaJogadoresScreen()),
+              );
+            },
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // --- BARRA DE PESQUISA ---
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: TextField(
-              controller: _buscaController,
-              decoration: InputDecoration(
-                hintText: 'Buscar por nome, cidade ou clube...',
-                hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF00B167)),
-                suffixIcon: Container(
-                  margin: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F8F0),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.tune,
-                    color: Color(0xFF00B167),
-                    size: 20,
-                  ),
-                ),
-                filled: true,
-                fillColor: const Color(0xFFF5F6F8),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-
-          // --- FILTROS RÁPIDOS (Pílulas horizontais) ---
-          Container(
-            color: Colors.white,
-            width: double.infinity,
-            padding: const EdgeInsets.only(bottom: 12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: _filtros.map((filtro) {
-                  bool isSelected = _filtroAtivo == filtro;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _filtroAtivo = filtro),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 8,
+      body: StreamBuilder<List<Player>>(
+        stream: playerRepository.watchPlayers(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final players = snapshot.data!;
+          return StreamBuilder<Set<String>>(
+            stream: currentUserId == null
+                ? Stream.value(<String>{})
+                : favoritesRepository.watchFavoritePlayerIds(currentUserId),
+            builder: (context, favoritesSnapshot) {
+              final favorites = favoritesSnapshot.data ?? <String>{};
+              return ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _FeaturedPlayer(repository: playerRepository),
+                  const SizedBox(height: 12),
+                  TextField(
+                    readOnly: true,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const BuscaJogadoresScreen(),
                         ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? const Color(0xFF00B167)
-                              : Colors.transparent,
-                          border: Border.all(
-                            color: isSelected
-                                ? const Color(0xFF00B167)
-                                : Colors.grey.shade300,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          filtro,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black54,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                          ),
-                        ),
-                      ),
+                      );
+                    },
+                    decoration: const InputDecoration(
+                      hintText: 'Pesquisar por posicao, cidade, idade...',
+                      prefixIcon: Icon(Icons.search),
+                      suffixIcon: Icon(Icons.manage_search),
                     ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // --- LISTA DE JOGADORES (Feed) ---
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _jogadoresMock.length,
-              itemBuilder: (context, index) {
-                final jogador = _jogadoresMock[index];
-                return _buildPlayerCard(jogador);
-              },
-            ),
-          ),
-        ],
+                  ),
+                  const SizedBox(height: 18),
+                  if (players.isEmpty)
+                    const _EmptyState()
+                  else
+                    ...players.map((player) {
+                      final isFavorite = favorites.contains(player.id);
+                      return PlayerCard(
+                        player: player,
+                        isFavorite: isFavorite,
+                        onFavorite: currentUserId == null
+                            ? null
+                            : () => favoritesRepository.toggleFavorite(
+                                clubId: currentUserId,
+                                playerId: player.id,
+                                isFavorite: isFavorite,
+                              ),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PerfilJogadorScreen(playerId: player.id),
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }
+}
 
-  // --- WIDGET DO CARD DO JOGADOR ---
-  Widget _buildPlayerCard(Map<String, dynamic> jogador) {
-    return GestureDetector(
-      onTap: () {
-        // Ao clicar no card, o olheiro é levado para a tela de Perfil do Jogador!
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const PerfilJogadorScreen()),
+class _FeaturedPlayer extends StatelessWidget {
+  const _FeaturedPlayer({required this.repository});
+
+  final PlayerRepository repository;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Player?>(
+      stream: repository.watchFeaturedPlayer(),
+      builder: (context, snapshot) {
+        final player = snapshot.data;
+        if (player == null) return const SizedBox.shrink();
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 34,
+                backgroundImage: player.fotoUrl.isEmpty
+                    ? null
+                    : NetworkImage(player.fotoUrl),
+                backgroundColor: Colors.white,
+                child: player.fotoUrl.isEmpty
+                    ? const Icon(Icons.person, color: AppColors.primary)
+                    : null,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Jogador em destaque da semana',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      player.nome,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      '${player.mediaAvaliacoes.toStringAsFixed(1)} estrelas • ${player.stats.gols} gols',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Ver perfil',
+                color: Colors.white,
+                icon: const Icon(Icons.arrow_forward),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PerfilJogadorScreen(playerId: player.id),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         );
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Foto circular
-            Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                CircleAvatar(
-                  radius: 35,
-                  backgroundImage: NetworkImage(jogador['fotoUrl']),
-                ),
-                if (jogador['isVerificado'])
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.verified,
-                      color: Color(0xFF00B167),
-                      size: 20,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 16),
+    );
+  }
+}
 
-            // Informações do jogador
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    jogador['nome'],
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    jogador['posicao'],
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF00B167),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 14,
-                        color: Colors.black45,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        jogador['cidade'],
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black54,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Icon(
-                        Icons.cake_outlined,
-                        size: 14,
-                        color: Colors.black45,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${jogador['idade']} anos',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
 
-            // Nota (Rating)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF9E6), // Fundo amarelado
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  const Icon(Icons.star, color: Color(0xFFFFB800), size: 20),
-                  const SizedBox(height: 4),
-                  Text(
-                    jogador['nota'].toString(),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: Color(0xFF1A1A1A),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(top: 80),
+      child: Column(
+        children: [
+          Icon(Icons.sports_soccer, size: 48, color: AppColors.muted),
+          SizedBox(height: 12),
+          Text('Nenhum jogador cadastrado ainda.'),
+        ],
       ),
     );
   }

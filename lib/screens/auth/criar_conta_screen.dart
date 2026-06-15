@@ -1,84 +1,79 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importação essencial para salvar dados
-import '../perfil/editar_perfil_screen.dart';
-import 'home_screen.dart';
+import 'package:flutter/material.dart';
 
-enum TipoUsuario { jogador, clube, olheiro }
+import '../../models/app_user.dart';
+import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/app_text_field.dart';
+import '../perfil/editar_perfil_screen.dart';
 
 class CriarContaScreen extends StatefulWidget {
   const CriarContaScreen({super.key});
+
   @override
   State<CriarContaScreen> createState() => _CriarContaScreenState();
 }
 
 class _CriarContaScreenState extends State<CriarContaScreen> {
-  TipoUsuario _tipoSelecionado = TipoUsuario.jogador;
-  final TextEditingController _nomeController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _senhaController = TextEditingController();
+  final _authService = AuthService();
+  final _nomeController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _senhaController = TextEditingController();
+  final _cidadeController = TextEditingController();
+  final _estadoController = TextEditingController();
+  UserType _tipoSelecionado = UserType.jogador;
   bool _isLoading = false;
 
-  Future<void> _realizarCadastro() async {
-    if (_nomeController.text.isEmpty ||
-        _emailController.text.isEmpty ||
-        _senhaController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preencha todos os campos!')),
-      );
+  Future<void> _criarConta() async {
+    final requiredFields = [
+      _nomeController.text,
+      _emailController.text,
+      _senhaController.text,
+      _cidadeController.text,
+      _estadoController.text,
+    ];
+    if (requiredFields.any((field) => field.trim().isEmpty)) {
+      _showMessage('Preencha todos os campos.');
       return;
     }
 
     setState(() => _isLoading = true);
     try {
-      // 1. Cria o usuário no Autenticador
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _senhaController.text.trim(),
-          );
-
-      // 2. Salva o nome e tipo no Firestore vinculado ao ID do usuário criado
-      await FirebaseFirestore.instance
-          .collection('jogadores')
-          .doc(userCredential.user!.uid)
-          .set({
-            'nome': _nomeController.text.trim(),
-            'email': _emailController.text.trim(),
-            'tipo': _tipoSelecionado
-                .toString()
-                .split('.')
-                .last, // Salva apenas 'jogador' ou 'olheiro'
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-
+      final user = await _authService.createAccount(
+        nome: _nomeController.text,
+        email: _emailController.text,
+        senha: _senhaController.text,
+        cidade: _cidadeController.text,
+        estado: _estadoController.text,
+        tipoUsuario: _tipoSelecionado,
+      );
       if (!mounted) return;
-
-      // 3. Direciona para a tela correta dependendo do tipo
-      if (_tipoSelecionado == TipoUsuario.jogador) {
+      if (user.tipoUsuario == UserType.jogador) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const EditarPerfilScreen()),
+          MaterialPageRoute(
+            builder: (_) => EditarPerfilScreen(playerId: user.id),
+          ),
         );
       } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+        Navigator.pop(context);
       }
     } on FirebaseAuthException catch (e) {
-      String mensagem = 'Erro ao criar conta';
-      if (e.code == 'email-already-in-use') {
-        mensagem = 'Este e-mail já está cadastrado.';
-      } else if (e.code == 'weak-password') {
-        mensagem = 'A senha é muito fraca (mínimo de 6 caracteres).';
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(mensagem)));
+      final message = switch (e.code) {
+        'email-already-in-use' => 'Este e-mail ja esta cadastrado.',
+        'weak-password' => 'A senha precisa ter pelo menos 6 caracteres.',
+        _ => 'Nao foi possivel criar sua conta.',
+      };
+      _showMessage(message);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -86,211 +81,88 @@ class _CriarContaScreenState extends State<CriarContaScreen> {
     _nomeController.dispose();
     _emailController.dispose();
     _senhaController.dispose();
+    _cidadeController.dispose();
+    _estadoController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1E3A2F)),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Crie sua Conta',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E3A2F),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Junte-se ao FutConecta e mostre seu talento para o mundo.',
-              style: TextStyle(fontSize: 16, color: Colors.black54),
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'Nome Completo',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _nomeController,
-              hint: 'Como você quer ser chamado',
-              icon: Icons.person_outline,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'E-mail',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _emailController,
-              hint: 'seu@email.com',
-              icon: Icons.mail_outline,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Senha',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _senhaController,
-              hint: 'Mínimo de 6 caracteres',
-              icon: Icons.lock_outline,
-              isPassword: true,
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'Eu sou um:',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _buildRoleCard(
-                  title: 'Jogador',
-                  icon: Icons.sports_soccer,
-                  type: TipoUsuario.jogador,
-                ),
-                const SizedBox(width: 16),
-                _buildRoleCard(
-                  title: 'Olheiro/Clube',
-                  icon: Icons.search,
-                  type: TipoUsuario.olheiro,
-                ),
-              ],
-            ),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _realizarCadastro,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF388E3C),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                    : const Text(
-                        'Finalizar Cadastro',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool isPassword = false,
-  }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: isPassword,
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: Colors.black54),
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.black38),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 18),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF388E3C), width: 1.5),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRoleCard({
-    required String title,
-    required IconData icon,
-    required TipoUsuario type,
-  }) {
-    bool isSelected = _tipoSelecionado == type;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _tipoSelecionado = type),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF388E3C) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected
-                  ? const Color(0xFF388E3C)
-                  : Colors.grey.shade300,
-              width: 1.5,
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: const Color(0xFF388E3C).withOpacity(0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : [],
+      appBar: AppBar(title: const Text('Cadastro')),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const Text(
+            'Escolha como voce quer usar o FutConecta.',
+            style: TextStyle(fontSize: 16, color: AppColors.muted),
           ),
-          child: Column(
-            children: [
-              Icon(
-                icon,
-                size: 36,
-                color: isSelected ? Colors.white : Colors.black54,
+          const SizedBox(height: 18),
+          SegmentedButton<UserType>(
+            segments: const [
+              ButtonSegment(
+                value: UserType.jogador,
+                label: Text('Jogador'),
+                icon: Icon(Icons.sports_soccer),
               ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black87,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
+              ButtonSegment(
+                value: UserType.clubeTreinadorOlheiro,
+                label: Text('Clube/Olheiro'),
+                icon: Icon(Icons.manage_search),
               ),
             ],
+            selected: {_tipoSelecionado},
+            onSelectionChanged: (selection) {
+              setState(() => _tipoSelecionado = selection.first);
+            },
           ),
-        ),
+          const SizedBox(height: 20),
+          AppTextField(
+            controller: _nomeController,
+            label: 'Nome',
+            icon: Icons.person,
+          ),
+          const SizedBox(height: 12),
+          AppTextField(
+            controller: _emailController,
+            label: 'E-mail',
+            icon: Icons.mail_outline,
+            keyboardType: TextInputType.emailAddress,
+          ),
+          const SizedBox(height: 12),
+          AppTextField(
+            controller: _senhaController,
+            label: 'Senha',
+            icon: Icons.lock_outline,
+            obscureText: true,
+          ),
+          const SizedBox(height: 12),
+          AppTextField(
+            controller: _cidadeController,
+            label: 'Cidade',
+            icon: Icons.location_city,
+          ),
+          const SizedBox(height: 12),
+          AppTextField(
+            controller: _estadoController,
+            label: 'Estado',
+            icon: Icons.map_outlined,
+          ),
+          const SizedBox(height: 28),
+          ElevatedButton(
+            onPressed: _isLoading ? null : _criarConta,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text('Finalizar cadastro'),
+          ),
+        ],
       ),
     );
   }

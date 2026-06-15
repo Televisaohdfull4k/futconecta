@@ -1,51 +1,53 @@
 import 'dart:io';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../auth/home_screen.dart'; // Importando a tela principal
+
+import '../../models/player.dart';
+import '../../repositories/player_repository.dart';
+import '../../services/storage_service.dart';
+import '../../widgets/app_text_field.dart';
+import '../../widgets/section_title.dart';
 
 class EditarPerfilScreen extends StatefulWidget {
-  const EditarPerfilScreen({super.key});
+  const EditarPerfilScreen({super.key, this.playerId});
+
+  final String? playerId;
 
   @override
   State<EditarPerfilScreen> createState() => _EditarPerfilScreenState();
 }
 
 class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
-  // Controladores para todos os campos
-  final _nomeController = TextEditingController();
-  final _idadeController = TextEditingController();
-  final _cidadeController = TextEditingController();
-  final _telefoneController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _biografiaController = TextEditingController();
-  final _alturaController = TextEditingController();
-  final _pesoController = TextEditingController();
-  final _clubeAtualController = TextEditingController();
-  final _experienciaController = TextEditingController();
-  final _partidasController = TextEditingController();
-  final _golsController = TextEditingController();
-  final _assistenciasController = TextEditingController();
-  String? _posicaoSelecionada;
-  String? _posicaoSecundariaSelecionada;
-  String? _peDominanteSelecionado;
+  final _repository = PlayerRepository();
+  final _storage = StorageService();
+  final _picker = ImagePicker();
 
-  // Variáveis para a foto de perfil
-  File? _imageFile;
-  final ImagePicker _picker = ImagePicker();
+  final _nome = TextEditingController();
+  final _idade = TextEditingController();
+  final _cidade = TextEditingController();
+  final _estado = TextEditingController();
+  final _telefone = TextEditingController();
+  final _altura = TextEditingController();
+  final _peso = TextEditingController();
+  final _clubeAtual = TextEditingController();
+  final _bio = TextEditingController();
+  final _jogos = TextEditingController();
+  final _gols = TextEditingController();
+  final _assistencias = TextEditingController();
+  final _amarelos = TextEditingController();
+  final _vermelhos = TextEditingController();
 
-  // Função para abrir a galeria e escolher uma foto
-  Future<void> _escolherFoto() async {
-    final XFile? fotoSelecionada = await _picker.pickImage(
-      source: ImageSource.gallery,
-    );
-    if (fotoSelecionada != null) {
-      setState(() {
-        _imageFile = File(fotoSelecionada.path);
-      });
-    }
-  }
+  String? _posicaoPrincipal;
+  String? _posicaoSecundaria;
+  String? _peDominante;
+  String _fotoUrl = '';
+  File? _foto;
+  bool _loaded = false;
+  bool _saving = false;
 
-  final List<String> _posicoes = [
+  static const _posicoes = [
     'Goleiro',
     'Zagueiro',
     'Lateral',
@@ -53,349 +55,304 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
     'Meio-Campo',
     'Atacante',
   ];
-  final List<String> _pesDominantes = ['Direito', 'Esquerdo', 'Ambos'];
+  static const _pes = ['Direito', 'Esquerdo', 'Ambos'];
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 24.0, bottom: 16.0),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Color(0xFF1E3A2F),
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-        ),
-      ),
-    );
+  String get _playerId =>
+      widget.playerId ?? FirebaseAuth.instance.currentUser!.uid;
+
+  Future<void> _load() async {
+    if (_loaded) return;
+    final player = await _repository.getPlayer(_playerId);
+    if (player == null) {
+      _loaded = true;
+      return;
+    }
+    _nome.text = player.nome;
+    _idade.text = player.idade == 0 ? '' : '${player.idade}';
+    _cidade.text = player.cidade;
+    _estado.text = player.estado;
+    _telefone.text = player.telefone;
+    _altura.text = player.altura == 0 ? '' : '${player.altura}';
+    _peso.text = player.peso == 0 ? '' : '${player.peso}';
+    _clubeAtual.text = player.clubeAtual;
+    _bio.text = player.biografia;
+    _jogos.text = '${player.stats.jogos}';
+    _gols.text = '${player.stats.gols}';
+    _assistencias.text = '${player.stats.assistencias}';
+    _amarelos.text = '${player.stats.cartoesAmarelos}';
+    _vermelhos.text = '${player.stats.cartoesVermelhos}';
+    _posicaoPrincipal = player.posicaoPrincipal.isEmpty
+        ? null
+        : player.posicaoPrincipal;
+    _posicaoSecundaria = player.posicaoSecundaria.isEmpty
+        ? null
+        : player.posicaoSecundaria;
+    _peDominante = player.peDominante.isEmpty ? null : player.peDominante;
+    _fotoUrl = player.fotoUrl;
+    _loaded = true;
   }
 
-  Widget _buildTextField(
-    String label,
-    TextEditingController controller, {
-    IconData? icon,
-    int maxLines = 1,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: TextFormField(
-        controller: controller,
-        maxLines: maxLines,
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: const TextStyle(color: Colors.black54),
-          prefixIcon: icon != null ? Icon(icon, color: Colors.black54) : null,
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 18,
-            horizontal: 16,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF388E3C), width: 1.5),
-          ),
-        ),
-      ),
+  Future<void> _pickPhoto() async {
+    final image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) setState(() => _foto = File(image.path));
+  }
+
+  Future<void> _pickVideo() async {
+    final video = await _picker.pickVideo(source: ImageSource.gallery);
+    if (video == null) return;
+    final url = await _storage.uploadPlayerVideo(_playerId, File(video.path));
+    await _repository.addVideo(
+      playerId: _playerId,
+      videoUrl: url,
+      titulo: 'Video de desempenho',
     );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Video enviado com sucesso.')),
+      );
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      var photoUrl = _fotoUrl;
+      if (_foto != null) {
+        photoUrl = await _storage.uploadProfilePhoto(_playerId, _foto!);
+      }
+      final existing =
+          await _repository.getPlayer(_playerId) ?? Player.empty(_playerId);
+      final player = Player(
+        id: _playerId,
+        userId: existing.userId,
+        nome: _nome.text.trim(),
+        idade: int.tryParse(_idade.text) ?? 0,
+        cidade: _cidade.text.trim(),
+        estado: _estado.text.trim().toUpperCase(),
+        altura: double.tryParse(_altura.text.replaceAll(',', '.')) ?? 0,
+        peso: double.tryParse(_peso.text.replaceAll(',', '.')) ?? 0,
+        posicaoPrincipal: _posicaoPrincipal ?? '',
+        posicaoSecundaria: _posicaoSecundaria ?? '',
+        peDominante: _peDominante ?? '',
+        clubeAtual: _clubeAtual.text.trim(),
+        biografia: _bio.text.trim(),
+        fotoUrl: photoUrl,
+        telefone: _telefone.text.trim(),
+        stats: PlayerStats(
+          jogos: int.tryParse(_jogos.text) ?? 0,
+          gols: int.tryParse(_gols.text) ?? 0,
+          assistencias: int.tryParse(_assistencias.text) ?? 0,
+          cartoesAmarelos: int.tryParse(_amarelos.text) ?? 0,
+          cartoesVermelhos: int.tryParse(_vermelhos.text) ?? 0,
+        ),
+        mediaAvaliacoes: existing.mediaAvaliacoes,
+        totalAvaliacoes: existing.totalAvaliacoes,
+      );
+      await _repository.savePlayer(player);
+      if (mounted) Navigator.pop(context);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final controller in [
+      _nome,
+      _idade,
+      _cidade,
+      _estado,
+      _telefone,
+      _altura,
+      _peso,
+      _clubeAtual,
+      _bio,
+      _jogos,
+      _gols,
+      _assistencias,
+      _amarelos,
+      _vermelhos,
+    ]) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          "Editar Perfil",
-          style: TextStyle(
-            color: Color(0xFF1E3A2F),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Color(0xFF1E3A2F)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Foto de Perfil
-            Center(
-              child: GestureDetector(
-                onTap: _escolherFoto,
-                child: Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    CircleAvatar(
-                      radius: 55,
-                      backgroundColor: const Color(0xFFE8F5E9),
-                      backgroundImage: _imageFile != null
-                          ? FileImage(_imageFile!)
-                          : null,
-                      child: _imageFile == null
-                          ? const Icon(
-                              Icons.person,
-                              size: 60,
-                              color: Color(0xFF388E3C),
-                            )
-                          : null,
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF388E3C),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            _buildSectionTitle("INFORMAÇÕES PESSOAIS"),
-            _buildTextField(
-              "Nome Completo",
-              _nomeController,
-              icon: Icons.person,
-            ),
-            _buildTextField(
-              "Idade",
-              _idadeController,
-              icon: Icons.calendar_today,
-            ),
-            _buildTextField(
-              "Cidade e Estado",
-              _cidadeController,
-              icon: Icons.location_on,
-            ),
-            _buildTextField(
-              "Telefone para contato",
-              _telefoneController,
-              icon: Icons.phone,
-            ),
-            _buildTextField("E-mail", _emailController, icon: Icons.email),
-            _buildTextField(
-              "Biografia / Descrição do atleta",
-              _biografiaController,
-              icon: Icons.description,
-              maxLines: 3,
-            ),
-
-            _buildSectionTitle("DADOS FÍSICOS"),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField("Altura (m)", _alturaController),
-                ),
-                const SizedBox(width: 10),
-                Expanded(child: _buildTextField("Peso (kg)", _pesoController)),
-              ],
-            ),
-
-            _buildSectionTitle("CARACTERÍSTICAS DE JOGO"),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: "Posição Principal",
-                labelStyle: TextStyle(color: Colors.black54),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: 18,
-                  horizontal: 16,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide(color: Color(0xFFE0E0E0)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide(color: Color(0xFF388E3C), width: 1.5),
-                ),
-              ),
-              value: _posicaoSelecionada,
-              items: _posicoes
-                  .map((pos) => DropdownMenuItem(value: pos, child: Text(pos)))
-                  .toList(),
-              onChanged: (val) => setState(() => _posicaoSelecionada = val),
-            ),
-
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: "Posição Secundária",
-                labelStyle: TextStyle(color: Colors.black54),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: 18,
-                  horizontal: 16,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide(color: Color(0xFFE0E0E0)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide(color: Color(0xFF388E3C), width: 1.5),
-                ),
-              ),
-              value: _posicaoSecundariaSelecionada,
-              items: _posicoes
-                  .map((pos) => DropdownMenuItem(value: pos, child: Text(pos)))
-                  .toList(),
-              onChanged: (val) =>
-                  setState(() => _posicaoSecundariaSelecionada = val),
-            ),
-
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: "Pé Dominante",
-                labelStyle: TextStyle(color: Colors.black54),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: 18,
-                  horizontal: 16,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide(color: Color(0xFFE0E0E0)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide(color: Color(0xFF388E3C), width: 1.5),
-                ),
-              ),
-              value: _peDominanteSelecionado,
-              items: _pesDominantes
-                  .map((pe) => DropdownMenuItem(value: pe, child: Text(pe)))
-                  .toList(),
-              onChanged: (val) => setState(() => _peDominanteSelecionado = val),
-            ),
-
-            const SizedBox(height: 16),
-            _buildTextField(
-              "Clube atual",
-              _clubeAtualController,
-              icon: Icons.shield,
-            ),
-            _buildTextField(
-              "Tempo de experiência",
-              _experienciaController,
-              icon: Icons.history,
-            ),
-
-            _buildSectionTitle("ESTATÍSTICAS DA TEMPORADA"),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    "Partidas",
-                    _partidasController,
-                    icon: Icons.sports,
+    return FutureBuilder(
+      future: _load(),
+      builder: (context, snapshot) {
+        if (!_loaded) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return Scaffold(
+          appBar: AppBar(title: const Text('Editar perfil')),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Center(
+                child: InkWell(
+                  onTap: _pickPhoto,
+                  child: CircleAvatar(
+                    radius: 54,
+                    backgroundImage: _foto != null
+                        ? FileImage(_foto!)
+                        : (_fotoUrl.isEmpty ? null : NetworkImage(_fotoUrl))
+                              as ImageProvider?,
+                    child: _foto == null && _fotoUrl.isEmpty
+                        ? const Icon(Icons.add_a_photo, size: 34)
+                        : null,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildTextField(
-                    "Gols",
-                    _golsController,
-                    icon: Icons.sports_soccer,
+              ),
+              const SectionTitle('Informacoes basicas'),
+              AppTextField(
+                controller: _nome,
+                label: 'Nome',
+                icon: Icons.person,
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppTextField(controller: _idade, label: 'Idade'),
                   ),
-                ),
-              ],
-            ),
-            _buildTextField(
-              "Assistências",
-              _assistenciasController,
-              icon: Icons.emoji_events,
-            ),
-
-            const SizedBox(height: 40),
-
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 55,
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.pop(context); // Cancelar e voltar
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: Colors.redAccent,
-                          width: 1.5,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Cancelar',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.redAccent,
-                        ),
-                      ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: AppTextField(
+                      controller: _telefone,
+                      label: 'WhatsApp',
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: SizedBox(
-                    height: 55,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Perfil atualizado com sucesso!'),
-                          ),
-                        );
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const HomeScreen(),
-                          ),
-                          (route) => false,
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF388E3C),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Salvar',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppTextField(controller: _cidade, label: 'Cidade'),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 100,
+                    child: AppTextField(controller: _estado, label: 'Estado'),
+                  ),
+                ],
+              ),
+              const SectionTitle('Caracteristicas fisicas'),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppTextField(controller: _altura, label: 'Altura'),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: AppTextField(controller: _peso, label: 'Peso'),
+                  ),
+                ],
+              ),
+              const SectionTitle('Futebol'),
+              _dropdown('Posicao principal', _posicaoPrincipal, _posicoes, (v) {
+                setState(() => _posicaoPrincipal = v);
+              }),
+              const SizedBox(height: 10),
+              _dropdown('Posicao secundaria', _posicaoSecundaria, _posicoes, (
+                v,
+              ) {
+                setState(() => _posicaoSecundaria = v);
+              }),
+              const SizedBox(height: 10),
+              _dropdown('Pe dominante', _peDominante, _pes, (v) {
+                setState(() => _peDominante = v);
+              }),
+              const SizedBox(height: 10),
+              AppTextField(controller: _clubeAtual, label: 'Clube atual'),
+              const SectionTitle('Estatisticas'),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppTextField(controller: _jogos, label: 'Jogos'),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: AppTextField(controller: _gols, label: 'Gols'),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: AppTextField(
+                      controller: _assistencias,
+                      label: 'Assist.',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppTextField(
+                      controller: _amarelos,
+                      label: 'Amarelos',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: AppTextField(
+                      controller: _vermelhos,
+                      label: 'Vermelhos',
+                    ),
+                  ),
+                ],
+              ),
+              const SectionTitle('Biografia'),
+              AppTextField(
+                controller: _bio,
+                label: 'Apresentacao',
+                maxLines: 4,
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: _pickVideo,
+                icon: const Icon(Icons.video_library_outlined),
+                label: const Text('Adicionar video de desempenho'),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
                           color: Colors.white,
+                          strokeWidth: 2,
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
+                      )
+                    : const Text('Salvar perfil'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _dropdown(
+    String label,
+    String? value,
+    List<String> items,
+    ValueChanged<String?> onChanged,
+  ) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: InputDecoration(labelText: label),
+      items: items
+          .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+          .toList(),
+      onChanged: onChanged,
     );
   }
 }

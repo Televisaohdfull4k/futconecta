@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
-import '../feed/feed_olheiro_screen.dart';
-import '../perfil/perfil_jogador_screen.dart';
+
+import '../../theme/app_theme.dart';
 import '../feed/chat_lista_screen.dart';
+import '../feed/feed_olheiro_screen.dart';
+import '../favoritos/favoritos_screen.dart';
+import '../perfil/perfil_jogador_screen.dart';
+import '../ranking/ranking_screen.dart';
+import '../settings/settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,37 +18,48 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _indiceAtual = 0;
 
-  // Lista de telas que o menu irá alternar
-  final List<Widget> _telas = [
-    const FeedOlheiroScreen(),
-    const ChatListaScreen(),
-    const PerfilJogadorScreen(),
+  final _telas = const [
+    FeedOlheiroScreen(),
+    RankingScreen(),
+    FavoritosScreen(),
+    ChatListaScreen(),
+    PerfilJogadorScreen(),
+    SettingsScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _indiceAtual, children: _telas),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _indiceAtual,
-        onTap: (indice) {
-          setState(() {
-            _indiceAtual = indice;
-          });
-        },
-        selectedItemColor: const Color(0xFF388E3C),
-        unselectedItemColor: Colors.grey.shade400,
-        showUnselectedLabels: true,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Navegar'),
-          BottomNavigationBarItem(
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _indiceAtual,
+        backgroundColor: AppColors.surface,
+        indicatorColor: AppColors.primaryLight,
+        onDestinationSelected: (index) => setState(() => _indiceAtual = index),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.groups_outlined),
+            label: 'Feed',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.leaderboard_outlined),
+            label: 'Ranking',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.favorite_border),
+            label: 'Favoritos',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
             label: 'Chat',
           ),
-          BottomNavigationBarItem(
+          NavigationDestination(
             icon: Icon(Icons.person_outline),
             label: 'Perfil',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            label: 'Config',
           ),
         ],
       ),
